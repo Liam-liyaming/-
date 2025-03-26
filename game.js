@@ -5,17 +5,18 @@ const restartBtn = document.getElementById('restartBtn');
 
 const gridSize = 40; // 提升物理分辨率
 const tileCount = canvas.width / gridSize;
+let foodParticles = [];
 
 let snake = [
-  {x: 10, y: 10},
+  {x: 5, y: 5},
 ];
 let food = {x: 15, y: 15};
-let dx = 0;
+let dx = 1;
 let dy = 0;
 let score = 0;
 let gameLoop;
 let baseSpeed = 1500; // 基础移动间隔（毫秒）
-let lastMoveTime = 0;
+let lastMoveTime = performance.now();
 
 function calculateSpeed() {
   const lengthFactor = Math.floor(snake.length / 5);
@@ -37,7 +38,9 @@ function drawGame(timestamp) {
     if (head.x === food.x && head.y === food.y) {
       score += 10;
       scoreElement.textContent = score;
-      generateFood();
+      const eatenFood = {x: food.x, y: food.y}; // 保存被吃食物坐标
+      generateParticles(eatenFood); // 使用旧坐标生成粒子
+      generateFood(); // 生成新食物
     } else {
       snake.pop();
     }
@@ -53,21 +56,39 @@ function drawGame(timestamp) {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // 绘制食物
-    ctx.fillStyle = 'red';
+    // 绘制苹果主体
+    ctx.fillStyle = '#FF3300';
     ctx.beginPath();
-    ctx.arc(
-      food.x * gridSize + gridSize/2,
-      food.y * gridSize + gridSize/2,
-      gridSize/2 - 1,
-      0,
-      Math.PI * 2
+    ctx.moveTo(food.x * gridSize + gridSize/2, food.y * gridSize + gridSize*0.2);
+    ctx.bezierCurveTo(
+      food.x * gridSize + gridSize*0.8, food.y * gridSize - gridSize*0.2,
+      food.x * gridSize + gridSize*1.0, food.y * gridSize + gridSize*0.6,
+      food.x * gridSize + gridSize/2, food.y * gridSize + gridSize*0.8
+    );
+    ctx.bezierCurveTo(
+      food.x * gridSize - gridSize*0.3, food.y * gridSize + gridSize*0.6,
+      food.x * gridSize + gridSize*0.2, food.y * gridSize - gridSize*0.2,
+      food.x * gridSize + gridSize/2, food.y * gridSize + gridSize*0.2
     );
     ctx.fill();
+
+    // 绘制苹果叶子
+    ctx.fillStyle = '#2ECC71';
+    ctx.beginPath();
+    ctx.moveTo(food.x * gridSize + gridSize*0.6, food.y * gridSize - gridSize*0.1);
+    ctx.quadraticCurveTo(
+      food.x * gridSize + gridSize*0.8, food.y * gridSize - gridSize*0.3,
+      food.x * gridSize + gridSize*0.4, food.y * gridSize - gridSize*0.2
+    );
+    ctx.fill();
+
+    // 更新和绘制食物粒子
+    updateParticles();
 
     // 绘制蛇身
     ctx.fillStyle = '#4CAF50';
     snake.forEach((segment, index) => {
-      const opacity = 1 - index * 0.1;
+      const opacity = Math.max(0.8, 1 - index / (snake.length * 0.5));
       ctx.fillStyle = `rgba(76, 175, 80, ${opacity})`;
       ctx.beginPath();
     ctx.arc(
@@ -154,7 +175,7 @@ document.addEventListener('keydown', (e) => {
 restartBtn.addEventListener('click', () => {
   snake = [{x: 10, y: 10}];
   food = {x: 15, y: 15};
-  dx = 0;
+  dx = 1;
   dy = 0;
   score = 0;
   scoreElement.textContent = score;
@@ -167,3 +188,38 @@ restartBtn.addEventListener('click', () => {
 
 // 开始游戏
 drawGame();
+
+function generateParticles(eatenFood) {
+  const particleCount = Math.floor(Math.random() * 5) + 8;
+  for (let i = 0; i < particleCount; i++) {
+    foodParticles.push({
+      x: eatenFood.x * gridSize + gridSize/2,
+      y: eatenFood.y * gridSize + gridSize/2,
+      dx: (Math.random() - 0.5) * 12,
+      dy: (Math.random() - 0.5) * 12,
+      alpha: 1,
+      decay: 0.2,
+      size: Math.random() * 3 + 2
+    });
+  }
+}
+
+function updateParticles() {
+  ctx.fillStyle = '#FF3300';
+  foodParticles.forEach((p, index) => {
+    p.x += p.dx;
+    p.y += p.dy;
+    p.dy += 0.3;
+    p.alpha -= 0.1;
+
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.globalAlpha = p.alpha;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    if (p.alpha <= 0) {
+      foodParticles.splice(index, 1);
+    }
+  });
+}
